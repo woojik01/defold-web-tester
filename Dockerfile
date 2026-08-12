@@ -1,4 +1,4 @@
-FROM node:22-bookworm
+FROM node:22-trixie
 
 ARG BOB_VERSION=1.12.4
 ENV NODE_ENV=production

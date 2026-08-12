@@ -8,6 +8,7 @@ ENV WORK_ROOT=/tmp/defold-web-tester
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends openjdk-25-jdk-headless curl ca-certificates unzip \
+    libxi6 \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app

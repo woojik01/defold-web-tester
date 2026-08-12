@@ -1,158 +1,573 @@
-<!doctype html>
-<html lang="ko">
+<!DOCTYPE html><html lang="ko">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="theme-color" content="#0b0d12">
-  <title>Defold Preview</title>
-  <style>
-    :root{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color-scheme:dark;background:#090b10;color:#f4f6fa}
-    *{box-sizing:border-box}
-    html,body{margin:0;min-height:100%;background:#090b10}
-    body{padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
-    button,input{font:inherit}
-    .app{width:min(980px,100%);margin:0 auto;padding:18px 14px 28px}
-    header{padding:8px 4px 16px}
-    h1{font-size:24px;margin:0 0 6px;letter-spacing:-.03em}
-    .sub{margin:0;color:#9ca3af;font-size:14px}
-    .upload{border:1px dashed #3b4352;border-radius:18px;background:#11151d;padding:18px;transition:.15s}
-    .upload.drag{border-color:#7aa2ff;background:#151b27}
-    .picker{display:block;cursor:pointer}
-    .picker input{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
-    .pickbox{min-height:130px;display:grid;place-items:center;text-align:center;border-radius:13px;background:#0b0e14;padding:20px}
-    .picktitle{font-weight:750;font-size:16px}
-    .pickhint{color:#8f98a7;font-size:13px;margin-top:5px}
-    .filename{margin-top:10px;color:#cbd5e1;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-    .run{width:100%;margin-top:12px;border:0;border-radius:12px;padding:13px 16px;background:#5b7cff;color:#fff;font-weight:750;cursor:pointer;touch-action:manipulation}
-    .run:disabled{opacity:.5;cursor:wait}
-    .progress{margin-top:14px;color:#aeb7c5;font-size:13px;min-height:20px;white-space:pre-wrap}
-    .preview{margin-top:16px;background:#050609;border:1px solid #272d38;border-radius:18px;overflow:hidden}
-    .bar{display:flex;align-items:center;gap:8px;min-height:48px;padding:8px 10px;border-bottom:1px solid #272d38;background:#11151d}
-    .bar strong{font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
-    .icon{width:40px;height:40px;border:0;border-radius:10px;background:#1b2230;color:#e7ebf2;display:grid;place-items:center;cursor:pointer;touch-action:manipulation}
-    .stage{position:relative;width:100%;height:min(78vh,760px);min-height:360px;background:#000}
-    iframe{display:block;width:100%;height:100%;border:0;background:#000}
-    .empty{position:absolute;inset:0;display:grid;place-items:center;color:#70798a;text-align:center;padding:30px;pointer-events:none}
-    .hidden{display:none!important}
-    .error{color:#ff8e8e}
-    .ok{color:#8be3ad}
-    .details{margin-top:10px;color:#7f8998;font-size:12px;line-height:1.6}
-    @media (max-width:600px){
-      .app{padding:12px 10px 20px}
-      header{padding:7px 3px 12px}
-      h1{font-size:21px}
-      .upload{padding:12px;border-radius:15px}
-      .pickbox{min-height:112px}
-      .stage{height:calc(100svh - 92px);min-height:300px}
-      .preview{margin-left:-10px;margin-right:-10px;border-left:0;border-right:0;border-radius:0}
-      .bar{padding-left:10px;padding-right:10px}
+  <meta charset="UTF-8">
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+  >
+  <title>Defold Web Tester</title>  <style>
+    * {
+      box-sizing: border-box;
     }
-    @media (orientation:landscape) and (max-height:600px){.stage{height:calc(100svh - 50px);min-height:250px}.bar{min-height:44px}}
-  </style>
-</head>
-<body>
-<div class="app">
-  <header>
-    <h1>Defold Preview</h1>
-    <p class="sub">Defold 프로젝트 ZIP을 올리면 자동으로 HTML5 빌드 후 바로 미리보기합니다.</p>
-  </header>
 
-  <section class="upload" id="uploadBox">
-    <label class="picker" for="file">
-      <input id="file" type="file" accept=".zip,application/zip">
-      <div class="pickbox">
-        <div>
-          <div class="picktitle">ZIP 파일 선택</div>
-          <div class="pickhint">휴대폰에서는 파일 앱에서 .zip을 선택하세요.</div>
-          <div class="filename" id="filename">선택된 파일 없음</div>
-        </div>
-      </div>
-    </label>
-    <button class="run" id="run" disabled>미리보기 실행</button>
-    <div class="progress" id="progress"></div>
-    <div class="details" id="details"></div>
-  </section>
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: #111;
+      color: #eee;
+      font-family: Arial, sans-serif;
+    }
 
-  <section class="preview hidden" id="preview">
-    <div class="bar">
-      <strong id="title">Game Preview</strong>
-      <button class="icon" id="reload" title="다시 실행" aria-label="다시 실행">↻</button>
-      <button class="icon" id="fullscreen" title="전체 화면" aria-label="전체 화면">⛶</button>
-    </div>
-    <div class="stage" id="stage">
-      <iframe id="game" title="Defold game preview" allow="autoplay; fullscreen; gamepad; pointer-lock" allowfullscreen></iframe>
-      <div class="empty" id="empty">빌드된 Defold 게임이 여기에 표시됩니다.</div>
-    </div>
-  </section>
-</div>
+    .container {
+      width: min(900px, 100%);
+      margin: auto;
+      padding: 20px;
+    }
 
-<script>
-const fileInput=document.querySelector('#file');
-const runButton=document.querySelector('#run');
-const uploadBox=document.querySelector('#uploadBox');
-const filename=document.querySelector('#filename');
-const progress=document.querySelector('#progress');
-const details=document.querySelector('#details');
-const preview=document.querySelector('#preview');
-const stage=document.querySelector('#stage');
-const game=document.querySelector('#game');
-const empty=document.querySelector('#empty');
-const title=document.querySelector('#title');
-const reload=document.querySelector('#reload');
-const fullscreen=document.querySelector('#fullscreen');
-let gameUrl='';
+    h1 {
+      margin-top: 0;
+      font-size: 24px;
+    }
 
-fileInput.addEventListener('change',()=>{
-  const file=fileInput.files[0];
-  filename.textContent=file?`${file.name} · ${formatSize(file.size)}`:'선택된 파일 없음';
-  runButton.disabled=!file;
-  progress.textContent='';
-  details.textContent='';
+    .upload-box {
+      border: 2px dashed #555;
+      border-radius: 14px;
+      padding: 35px 20px;
+      text-align: center;
+      cursor: pointer;
+      background: #181818;
+    }
+
+    .upload-box:active {
+      background: #222;
+    }
+
+    input[type="file"] {
+      display: none;
+    }
+
+    button {
+      border: 0;
+      border-radius: 10px;
+      padding: 12px 18px;
+      margin-top: 12px;
+      font-size: 15px;
+      cursor: pointer;
+    }
+
+    #runButton {
+      background: #4f8cff;
+      color: white;
+    }
+
+    #runButton:disabled {
+      opacity: 0.5;
+    }
+
+    .status {
+      margin-top: 15px;
+      padding: 12px;
+      border-radius: 10px;
+      background: #181818;
+    }
+
+    .log {
+      margin-top: 15px;
+      padding: 12px;
+      height: 260px;
+      overflow-y: auto;
+      background: #050505;
+      border: 1px solid #333;
+      border-radius: 10px;
+      font-family: monospace;
+      font-size: 12px;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .preview {
+      margin-top: 20px;
+      width: 100%;
+      background: #000;
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    iframe {
+      width: 100%;
+      height: 600px;
+      border: 0;
+      display: block;
+    }
+
+    @media (max-width: 600px) {
+      .container {
+        padding: 12px;
+      }
+
+      iframe {
+        height: 70vh;
+      }
+
+      h1 {
+        font-size: 20px;
+      }
+    }
+  </style></head><body><div class="container">  <h1>Defold Web Tester</h1>  <label class="upload-box" for="fileInput">
+    <div>Defold ZIP 선택</div>
+    <small>휴대폰에서는 파일 앱에서 .zip을 선택하세요.</small>
+  </label><input
+id="fileInput"
+type="file"
+accept=".zip,application/zip,application/x-zip-compressed"
+
+«»
+
+  <div class="status" id="status">
+    대기 중
+  </div>  <button id="runButton" disabled>
+    테스트 실행
+  </button>  <div class="log" id="log"></div>  <div class="preview">
+    <iframe
+      id="gameFrame"
+      title="Defold Game Preview"
+      allow="fullscreen; autoplay; gamepad"
+      allowfullscreen
+    ></iframe>
+  </div></div><script>
+"use strict";
+
+/*
+ * ============================================================
+ * Defold Web Tester - Debug Version
+ * ============================================================
+ */
+
+const fileInput = document.getElementById("fileInput");
+const runButton = document.getElementById("runButton");
+const statusElement = document.getElementById("status");
+const logElement = document.getElementById("log");
+const gameFrame = document.getElementById("gameFrame");
+
+let selectedFile = null;
+
+
+/* ------------------------------------------------------------
+ * LOGGING
+ * ------------------------------------------------------------ */
+
+function log(message, data = null) {
+  const time = new Date().toLocaleTimeString();
+
+  let text = `[${time}] ${message}`;
+
+  if (data !== null) {
+    try {
+      text += "\n" + JSON.stringify(data, null, 2);
+    } catch {
+      text += "\n" + String(data);
+    }
+  }
+
+  console.log(text);
+
+  const line = document.createElement("div");
+  line.textContent = text;
+
+  logElement.appendChild(line);
+  logElement.scrollTop = logElement.scrollHeight;
+}
+
+
+function setStatus(message) {
+  statusElement.textContent = message;
+  log("STATUS: " + message);
+}
+
+
+/* ------------------------------------------------------------
+ * INITIALIZATION
+ * ------------------------------------------------------------ */
+
+log("페이지 초기화");
+
+log("현재 URL", location.href);
+
+log("User Agent", navigator.userAgent);
+
+log("브라우저 정보", {
+  language: navigator.language,
+  online: navigator.onLine,
+  platform: navigator.platform
 });
 
-for(const event of ['dragenter','dragover']) uploadBox.addEventListener(event,e=>{e.preventDefault();uploadBox.classList.add('drag')});
-for(const event of ['dragleave','drop']) uploadBox.addEventListener(event,e=>{e.preventDefault();uploadBox.classList.remove('drag')});
-uploadBox.addEventListener('drop',e=>{
-  const file=[...e.dataTransfer.files].find(f=>f.name.toLowerCase().endsWith('.zip'));
-  if(!file)return setProgress('ZIP 파일만 사용할 수 있습니다.',true);
-  const dt=new DataTransfer();dt.items.add(file);fileInput.files=dt.files;fileInput.dispatchEvent(new Event('change'));
+log("파일 선택 input 생성 완료");
+
+
+/* ------------------------------------------------------------
+ * FILE SELECTION
+ * ------------------------------------------------------------ */
+
+fileInput.addEventListener("change", function(event) {
+
+  log("input change 이벤트 발생");
+
+  const files = event.target.files;
+
+  log("선택된 파일 개수: " + files.length);
+
+  if (!files || files.length === 0) {
+
+    log("파일이 선택되지 않았습니다.");
+
+    selectedFile = null;
+    runButton.disabled = true;
+
+    setStatus("파일이 선택되지 않음");
+
+    return;
+  }
+
+  const file = files[0];
+
+  log("파일 객체 수신 성공");
+
+  log("파일 정보", {
+    name: file.name,
+    size: file.size,
+    type: file.type,
+    lastModified: file.lastModified
+  });
+
+
+  /* ZIP 확장자 검사 */
+
+  const lowerName = file.name.toLowerCase();
+
+  if (!lowerName.endsWith(".zip")) {
+
+    log("ERROR: ZIP 확장자가 아닙니다.");
+
+    setStatus("ZIP 파일만 선택할 수 있습니다.");
+
+    selectedFile = null;
+    runButton.disabled = true;
+
+    return;
+  }
+
+
+  /* 파일 크기 검사 */
+
+  if (file.size === 0) {
+
+    log("ERROR: 파일 크기가 0 byte입니다.");
+
+    setStatus("빈 ZIP 파일입니다.");
+
+    selectedFile = null;
+    runButton.disabled = true;
+
+    return;
+  }
+
+
+  selectedFile = file;
+
+  runButton.disabled = false;
+
+  setStatus("ZIP 선택 완료");
+
+  log("ZIP 파일 선택 성공");
+  log("서버 업로드 준비 완료");
+
 });
 
-runButton.addEventListener('click',async()=>{
-  const file=fileInput.files[0];
-  if(!file)return;
-  runButton.disabled=true;
-  preview.classList.add('hidden');
-  game.removeAttribute('src');
-  details.textContent='';
-  setProgress('1/3  ZIP 업로드 중...');
-  const form=new FormData();form.append('project',file);
-  try{
-    setProgress('2/3  Defold 프로젝트 분석 및 HTML5 빌드 중...');
-    const response=await fetch('/api/build',{method:'POST',body:form});
-    const data=await response.json();
-    if(!response.ok) throw new Error(data.error||'빌드에 실패했습니다.'+(data.output?'\n\n'+data.output:''));
-    gameUrl=data.gameUrl;
-    title.textContent=data.projectName||'Game Preview';
-    details.textContent=`${data.projectName||'Unknown'} · Defold ${data.version||'Unknown'}`;
-    setProgress('3/3  미리보기 실행 중...','ok');
-    preview.classList.remove('hidden');
-    empty.classList.remove('hidden');
-    game.onload=()=>empty.classList.add('hidden');
-    game.src=gameUrl;
-    preview.scrollIntoView({behavior:'smooth',block:'start'});
-  }catch(error){
-    setProgress(error.message||'처리 중 오류가 발생했습니다.',true);
-  }finally{runButton.disabled=false;}
+
+/* ------------------------------------------------------------
+ * RUN
+ * ------------------------------------------------------------ */
+
+runButton.addEventListener("click", async function() {
+
+  log("테스트 실행 버튼 클릭");
+
+  if (!selectedFile) {
+
+    log("ERROR: selectedFile이 없습니다.");
+
+    setStatus("ZIP 파일을 먼저 선택하세요.");
+
+    return;
+  }
+
+  runButton.disabled = true;
+
+  setStatus("서버에 ZIP 업로드 중...");
+
+
+  /* ----------------------------------------------------------
+   * FormData
+   * ---------------------------------------------------------- */
+
+  const formData = new FormData();
+
+  log("FormData 생성");
+
+  /*
+   * 중요:
+   *
+   * 서버의 multer 설정이
+   *
+   * upload.single("project")
+   *
+   * 라면 반드시 "project"라는 이름을 사용해야 한다.
+   */
+
+  formData.append("project", selectedFile, selectedFile.name);
+
+  log("FormData에 파일 추가", {
+    fieldName: "project",
+    fileName: selectedFile.name,
+    size: selectedFile.size,
+    type: selectedFile.type
+  });
+
+
+  /* ----------------------------------------------------------
+   * REQUEST
+   * ---------------------------------------------------------- */
+
+  const uploadUrl = "/api/build";
+
+  log("POST 요청 시작");
+  log("요청 URL: " + uploadUrl);
+
+
+  try {
+
+    const response = await fetch(uploadUrl, {
+      method: "POST",
+      body: formData
+    });
+
+
+    log("서버 응답 수신");
+
+    log("HTTP 응답 정보", {
+      status: response.status,
+      statusText: response.statusText,
+      ok: response.ok,
+      contentType: response.headers.get("content-type")
+    });
+
+
+    /* --------------------------------------------------------
+     * RESPONSE BODY
+     * -------------------------------------------------------- */
+
+    const responseText = await response.text();
+
+    log("서버 응답 원문", responseText);
+
+
+    let result = null;
+
+    try {
+
+      result = JSON.parse(responseText);
+
+      log("JSON 파싱 성공", result);
+
+    } catch (error) {
+
+      log("JSON 파싱 실패");
+
+      log("서버가 JSON이 아닌 응답을 반환했습니다.");
+
+    }
+
+
+    /* --------------------------------------------------------
+     * ERROR
+     * -------------------------------------------------------- */
+
+    if (!response.ok) {
+
+      log("BUILD ERROR");
+
+      if (result && result.error) {
+
+        log("서버 오류 메시지: " + result.error);
+
+      } else {
+
+        log("서버 오류 응답을 확인하세요.");
+
+      }
+
+      setStatus("빌드 실패");
+
+      runButton.disabled = false;
+
+      return;
+    }
+
+
+    /* --------------------------------------------------------
+     * SUCCESS
+     * -------------------------------------------------------- */
+
+    log("서버 빌드 성공");
+
+    if (!result) {
+
+      log("ERROR: 성공 응답인데 JSON 결과가 없습니다.");
+
+      setStatus("잘못된 서버 응답");
+
+      runButton.disabled = false;
+
+      return;
+    }
+
+
+    log("빌드 결과", result);
+
+
+    /* --------------------------------------------------------
+     * GAME URL
+     * -------------------------------------------------------- */
+
+    let gameUrl = null;
+
+    if (result.url) {
+      gameUrl = result.url;
+    }
+
+    if (result.previewUrl) {
+      gameUrl = result.previewUrl;
+    }
+
+    if (result.gameUrl) {
+      gameUrl = result.gameUrl;
+    }
+
+
+    if (!gameUrl) {
+
+      log("ERROR: 서버 응답에서 게임 URL을 찾을 수 없습니다.");
+
+      log("서버 응답 구조를 확인하세요.", result);
+
+      setStatus("빌드는 성공했지만 게임 URL이 없습니다.");
+
+      runButton.disabled = false;
+
+      return;
+    }
+
+
+    log("게임 URL 발견: " + gameUrl);
+
+    setStatus("게임 실행 중...");
+
+
+    /* --------------------------------------------------------
+     * IFRAME
+     * -------------------------------------------------------- */
+
+    gameFrame.src = gameUrl;
+
+    log("iframe src 설정 완료");
+
+    log("게임 미리보기 로딩 시작");
+
+
+    gameFrame.onload = function() {
+
+      log("게임 iframe load 이벤트 발생");
+
+      setStatus("게임 로드 완료");
+
+    };
+
+
+    gameFrame.onerror = function(error) {
+
+      log("iframe ERROR", error);
+
+      setStatus("게임 iframe 로드 실패");
+
+    };
+
+
+  } catch (error) {
+
+    log("FETCH ERROR");
+
+    log("오류 이름: " + error.name);
+
+    log("오류 메시지: " + error.message);
+
+    log("오류 객체", error);
+
+    setStatus("서버 요청 실패");
+
+  } finally {
+
+    runButton.disabled = false;
+
+  }
+
 });
 
-reload.addEventListener('click',()=>{if(gameUrl){empty.classList.remove('hidden');game.src='';requestAnimationFrame(()=>game.src=gameUrl)}});
-fullscreen.addEventListener('click',async()=>{
-  try{if(document.fullscreenElement)await document.exitFullscreen();else await stage.requestFullscreen()}catch{}
+
+/* ------------------------------------------------------------
+ * GLOBAL ERRORS
+ * ------------------------------------------------------------ */
+
+window.addEventListener("error", function(event) {
+
+  log("GLOBAL JAVASCRIPT ERROR", {
+    message: event.message,
+    filename: event.filename,
+    line: event.lineno,
+    column: event.colno
+  });
+
 });
 
-function setProgress(text,error=false){progress.textContent=text;progress.className='progress '+(error?'error':'')}
-function formatSize(bytes){if(bytes<1024)return bytes+' B';if(bytes<1024*1024)return (bytes/1024).toFixed(1)+' KB';return (bytes/1024/1024).toFixed(1)+' MB'}
-</script>
-</body>
-</html>
+
+window.addEventListener("unhandledrejection", function(event) {
+
+  log("UNHANDLED PROMISE REJECTION", {
+    reason: String(event.reason)
+  });
+
+});
+
+
+/* ------------------------------------------------------------
+ * NETWORK STATUS
+ * ------------------------------------------------------------ */
+
+window.addEventListener("online", function() {
+
+  log("네트워크 연결됨");
+
+});
+
+
+window.addEventListener("offline", function() {
+
+  log("네트워크 연결 끊김");
+
+});
+
+
+log("초기화 완료");
+log("ZIP 파일을 선택하세요.");
+
+</script></body>
+  </html>

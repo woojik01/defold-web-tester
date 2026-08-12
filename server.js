@@ -15,7 +15,12 @@ const MAX_UPLOAD = MAX_UPLOAD_MB * 1024 * 1024;
 const BUILD_TIMEOUT_MS = Number(process.env.BUILD_TIMEOUT_MS || 5 * 60 * 1000);
 const BOB = process.env.BOB_JAR || "/opt/defold/bob.jar";
 
+const UPLOAD_DIR = path.join(ROOT, "uploads");
+const JOBS_DIR = path.join(ROOT, "jobs");
+
 fs.mkdirSync(ROOT, { recursive: true });
+fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+fs.mkdirSync(JOBS_DIR, { recursive: true });
 
 const upload = multer({
   dest: path.join(ROOT, "uploads"),

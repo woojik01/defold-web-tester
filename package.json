@@ -1,0 +1,15 @@
+{
+  "name": "defold-web-tester",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Upload a Defold project ZIP, analyze it, build it with Bob, and run the HTML5 bundle.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "adm-zip": "^0.5.16",
+    "express": "^5.1.0",
+    "multer": "^2.0.2"
+  }
+}

@@ -23,11 +23,27 @@ fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 fs.mkdirSync(JOBS_DIR, { recursive: true });
 
 const upload = multer({
-  dest: path.join(ROOT, "uploads"),
-  limits: { fileSize: MAX_UPLOAD },
-  fileFilter: (_req, file, cb) => {
-    const ok = path.extname(file.originalname).toLowerCase() === ".zip";
-    cb(ok ? null : new Error("ZIP 파일만 업로드할 수 있습니다."));
+  dest: UPLOAD_DIR,
+  limits: {
+    fileSize: MAX_UPLOAD
+  },
+  fileFilter: (req, file, cb) => {
+    console.log("[UPLOAD] fileFilter called");
+    console.log("[UPLOAD] fieldname:", file.fieldname);
+    console.log("[UPLOAD] originalname:", file.originalname);
+    console.log("[UPLOAD] mimetype:", file.mimetype);
+
+    const ok =
+      path.extname(file.originalname).toLowerCase() === ".zip";
+
+    if (!ok) {
+      console.log("[UPLOAD] rejected: not a ZIP");
+      return cb(new Error("ZIP 파일만 업로드할 수 있습니다."));
+    }
+
+    console.log("[UPLOAD] accepted");
+
+    cb(null, true);
   }
 });
 
@@ -192,85 +208,379 @@ app.get("/api/health", (_req, res) => {
   });
 });
 
-app.post("/api/build", upload.single("project"), async (req, res) => {
-  if (!req.file) return res.status(400).json({ error: "ZIP 파일이 없습니다." });
+app.post(
+  "/api/build",
 
-  const id = crypto.randomUUID();
-  const dir = jobDir(id);
-  const source = path.join(dir, "source");
-  const bundle = path.join(dir, "bundle");
-  const logFile = path.join(dir, "build.log");
+  (req, _res, next) => {
+    console.log("");
+    console.log("========================================");
+    console.log("[UPLOAD] /api/build request");
+    console.log("========================================");
 
-  try {
-    await fsp.mkdir(source, { recursive: true });
-    await fsp.mkdir(bundle, { recursive: true });
+    console.log("[UPLOAD] method:", req.method);
+    console.log("[UPLOAD] content-type:", req.headers["content-type"]);
+    console.log("[UPLOAD] content-length:", req.headers["content-length"]);
+    console.log("[UPLOAD] user-agent:", req.headers["user-agent"]);
 
-    extractZipSecurely(req.file.path, source);
-    const projectRoot = await findGameProject(source);
-    const project = parseGameProject(path.join(projectRoot, "game.project"));
+    next();
+  },
 
-    const report = {
-      id,
-      originalName: req.file.originalname,
-      projectRoot: path.relative(source, projectRoot) || ".",
-      projectName: project.project?.title || project.project?.name || "Unknown",
-      version: project.project?.version || "Unknown",
-      engine: project.project?.dependencies ? "external dependencies detected" : "standard",
-      status: "building"
-    };
+  (req, res, next) => {
+    upload.single("project")(req, res, (err) => {
 
-    await fsp.writeFile(path.join(dir, "analysis.json"), JSON.stringify(report, null, 2));
+      console.log("[UPLOAD] multer finished");
 
-    if (!fs.existsSync(BOB)) throw new Error(`bob.jar를 찾지 못했습니다: ${BOB}`);
+      if (err) {
+        console.error("[UPLOAD] MULTER ERROR");
+        console.error("name:", err.name);
+        console.error("message:", err.message);
+        console.error("code:", err.code);
+        console.error("field:", err.field);
+        console.error(err.stack);
 
-    // Bob must build the project archive before bundling.
-    await runBob(projectRoot, [
-      "--platform", "wasm-web",
-      "--variant", "debug",
-      "--archive",
-      "resolve",
-      "build"
-    ], logFile);
+        return res.status(400).json({
+          error: err.message,
+          multer: {
+            name: err.name,
+            code: err.code || null,
+            field: err.field || null
+          }
+        });
+      }
 
-    await runBob(projectRoot, [
-      "--platform", "wasm-web",
-      "--variant", "debug",
-      "--bundle-output", bundle,
-      "bundle"
-    ], logFile);
+      console.log("[UPLOAD] req.file:", req.file);
 
-    const index = findIndexHtml(bundle);
-    if (!index) throw new Error("HTML5 bundle에서 index.html을 찾지 못했습니다.");
+      console.log("[UPLOAD] req.body:", req.body);
 
-    report.status = "ready";
-    report.gameUrl = `/games/${id}/${path.relative(bundle, index).split(path.sep).join("/")}`;
-    report.logUrl = `/api/jobs/${id}/log`;
-    await fsp.writeFile(path.join(dir, "analysis.json"), JSON.stringify(report, null, 2));
+      if (!req.file) {
+        console.error("[UPLOAD] NO FILE RECEIVED");
 
-    await fsp.rm(req.file.path, { force: true });
-    res.json(report);
-  } catch (err) {
-    await fsp.rm(req.file.path, { force: true }).catch(() => {});
-    const report = {
-      id,
-      status: "error",
-      error: err.message,
-      output: err.output ? err.output.slice(-30000) : ""
-    };
-    await fsp.mkdir(dir, { recursive: true }).catch(() => {});
-    await fsp.writeFile(path.join(dir, "analysis.json"), JSON.stringify(report, null, 2)).catch(() => {});
-    res.status(422).json(report);
+        return res.status(400).json({
+          error: "ZIP 파일이 없습니다.",
+          debug: {
+            contentType: req.headers["content-type"] || null,
+            contentLength: req.headers["content-length"] || null,
+            bodyKeys: Object.keys(req.body || {}),
+            expectedField: "project"
+          }
+        });
+      }
+
+      console.log("[UPLOAD] FILE RECEIVED");
+      console.log({
+        fieldname: req.file.fieldname,
+        originalname: req.file.originalname,
+        encoding: req.file.encoding,
+        mimetype: req.file.mimetype,
+        destination: req.file.destination,
+        filename: req.file.filename,
+        path: req.file.path,
+        size: req.file.size
+      });
+
+      next();
+    });
+  },
+
+  async (req, res) => {
+
+    const id = crypto.randomUUID();
+
+    const dir = jobDir(id);
+    const source = path.join(dir, "source");
+    const bundle = path.join(dir, "bundle");
+    const logFile = path.join(dir, "build.log");
+
+    console.log("[BUILD] Job:", id);
+    console.log("[BUILD] Uploaded file:", req.file.path);
+
+    try {
+
+      await fsp.mkdir(source, { recursive: true });
+      await fsp.mkdir(bundle, { recursive: true });
+
+      console.log("[BUILD] Directories created");
+
+      /*
+       * ZIP extraction
+       */
+
+      console.log("[BUILD] Extracting ZIP");
+
+      extractZipSecurely(
+        req.file.path,
+        source
+      );
+
+      console.log("[BUILD] ZIP extracted");
+
+      /*
+       * Find game.project
+       */
+
+      console.log("[BUILD] Searching for game.project");
+
+      const projectRoot =
+        await findGameProject(source);
+
+      console.log(
+        "[BUILD] Project root:",
+        projectRoot
+      );
+
+      /*
+       * Parse project
+       */
+
+      const project =
+        parseGameProject(
+          path.join(
+            projectRoot,
+            "game.project"
+          )
+        );
+
+      console.log(
+        "[BUILD] Project:",
+        project
+      );
+
+      const report = {
+        id,
+        originalName:
+          req.file.originalname,
+
+        projectRoot:
+          path.relative(
+            source,
+            projectRoot
+          ) || ".",
+
+        projectName:
+          project.project?.title ||
+          project.project?.name ||
+          "Unknown",
+
+        version:
+          project.project?.version ||
+          "Unknown",
+
+        engine:
+          project.project?.dependencies
+            ? "external dependencies detected"
+            : "standard",
+
+        status: "building"
+      };
+
+      await fsp.writeFile(
+        path.join(
+          dir,
+          "analysis.json"
+        ),
+        JSON.stringify(
+          report,
+          null,
+          2
+        )
+      );
+
+      /*
+       * Bob check
+       */
+
+      console.log(
+        "[BUILD] Checking Bob:",
+        BOB
+      );
+
+      if (!fs.existsSync(BOB)) {
+        throw new Error(
+          `bob.jar를 찾지 못했습니다: ${BOB}`
+        );
+      }
+
+      console.log(
+        "[BUILD] Bob found"
+      );
+
+      /*
+       * Resolve/build
+       */
+
+      console.log(
+        "[BUILD] Starting Bob resolve/build"
+      );
+
+      await runBob(
+        projectRoot,
+        [
+          "--platform",
+          "wasm-web",
+
+          "--variant",
+          "debug",
+
+          "--archive",
+
+          "resolve",
+
+          "build"
+        ],
+        logFile
+      );
+
+      console.log(
+        "[BUILD] Resolve/build completed"
+      );
+
+      /*
+       * Bundle
+       */
+
+      console.log(
+        "[BUILD] Starting HTML5 bundle"
+      );
+
+      await runBob(
+        projectRoot,
+        [
+          "--platform",
+          "wasm-web",
+
+          "--variant",
+          "debug",
+
+          "--bundle-output",
+          bundle,
+
+          "bundle"
+        ],
+        logFile
+      );
+
+      console.log(
+        "[BUILD] HTML5 bundle completed"
+      );
+
+      /*
+       * Find index.html
+       */
+
+      const index =
+        findIndexHtml(bundle);
+
+      if (!index) {
+        throw new Error(
+          "HTML5 bundle에서 index.html을 찾지 못했습니다."
+        );
+      }
+
+      console.log(
+        "[BUILD] index.html:",
+        index
+      );
+
+      report.status =
+        "ready";
+
+      report.gameUrl =
+        `/games/${id}/${path
+          .relative(bundle, index)
+          .split(path.sep)
+          .join("/")}`;
+
+      report.logUrl =
+        `/api/jobs/${id}/log`;
+
+      await fsp.writeFile(
+        path.join(
+          dir,
+          "analysis.json"
+        ),
+        JSON.stringify(
+          report,
+          null,
+          2
+        )
+      );
+
+      /*
+       * Remove uploaded ZIP
+       */
+
+      await fsp.rm(
+        req.file.path,
+        {
+          force: true
+        }
+      );
+
+      console.log(
+        "[BUILD] Upload ZIP deleted"
+      );
+
+      console.log(
+        "[BUILD] SUCCESS:",
+        report.gameUrl
+      );
+
+      res.json(report);
+
+    } catch (err) {
+
+      console.error(
+        "[BUILD] ERROR:",
+        err
+      );
+
+      await fsp.rm(
+        req.file?.path,
+        {
+          force: true
+        }
+      ).catch(() => {});
+
+      const report = {
+        id,
+
+        status:
+          "error",
+
+        error:
+          err.message,
+
+        output:
+          err.output
+            ? err.output.slice(-30000)
+            : ""
+      };
+
+      await fsp.mkdir(
+        dir,
+        {
+          recursive: true
+        }
+      ).catch(() => {});
+
+      await fsp.writeFile(
+        path.join(
+          dir,
+          "analysis.json"
+        ),
+        JSON.stringify(
+          report,
+          null,
+          2
+        )
+      ).catch(() => {});
+
+      res.status(422).json(
+        report
+      );
+    }
   }
-});
-
-app.get("/api/jobs/:id/log", async (req, res) => {
-  try {
-    const log = await fsp.readFile(path.join(jobDir(req.params.id), "build.log"), "utf8");
-    res.type("text/plain").send(log);
-  } catch {
-    res.status(404).send("로그를 찾을 수 없습니다.");
-  }
-});
+);
 
 app.use("/games/:id", (req, res, next) => {
   const root = path.join(ROOT, "jobs", req.params.id, "bundle");
